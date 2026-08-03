@@ -321,6 +321,19 @@ effect and nothing else.
   smoothly instead of jumping once a minute.
 - Animations are disabled when the system asks for reduced motion.
 
+## Releasing
+
+HACS shows the name of a GitHub release; without one it falls back to the
+latest commit and puts a hash in the update card. So a release always carries
+a version number:
+
+1. Bump `CARD_VERSION` in `minimal-music-player.js`.
+2. Put that on `main`.
+3. `git tag v1.4.0 && git push origin v1.4.0`
+
+`.github/workflows/release.yml` publishes the release and attaches the card
+as an asset. It refuses a tag that does not match `CARD_VERSION`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Use, modify and redistribute it, commercially

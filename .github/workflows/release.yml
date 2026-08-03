@@ -1,0 +1,72 @@
+name: Release
+
+# HACS prefers a release over the default branch: it looks for the file named
+# in hacs.json among the release assets first, and only falls back to the file
+# tree. Without any release it shows the latest commit hash instead of a
+# version. This workflow publishes one as soon as you push a tag:
+#
+#   git tag v1.4.0 && git push origin v1.4.0
+#
+# So bump CARD_VERSION in minimal-music-player.js first, put that on main,
+# and only then tag.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release, for example v1.4.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Never publish a tag that would not load in the browsers the card
+      # claims to support. Same floor as compat.yml: ES modules arrive in
+      # Chrome 61, and parsing at ES2018 rejects ?. and ?? (both Chrome 80).
+      - name: Parse as ES2018
+        run: npx --yes acorn@8 --ecma2018 --module --silent minimal-music-player.js
+
+      - name: Reject CSS that older WebViews drop
+        run: |
+          if grep -nE '^[[:space:]]*(inset|gap|row-gap|column-gap):' minimal-music-player.js; then
+            echo "::error::inset needs Chrome 87 and flexbox gap needs Chrome 84."
+            exit 1
+          fi
+
+      - name: Check the tag matches CARD_VERSION
+        # Otherwise HACS installs "v1.5.0" while the browser console reports
+        # 1.4.0, and the update notice no longer means anything.
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version=$(grep -oP 'CARD_VERSION = "\K[^"]+' minimal-music-player.js)
+          echo "tag: ${tag#v}, CARD_VERSION: $version"
+          if [ "${tag#v}" != "$version" ]; then
+            echo "::error::Tag $tag does not match CARD_VERSION $version"
+            exit 1
+          fi
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          # --target creates the tag when it does not exist yet, so a release
+          # can also be started by hand without tagging first
+          gh release create "$tag" minimal-music-player.js \
+            --title "$tag" \
+            --target "${{ github.sha }}" \
+            --generate-notes
