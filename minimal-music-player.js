@@ -8,7 +8,7 @@
  * as a module resource.
  */
 
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.4.0";
 
 /* ------------------------------------------------------------------ icons */
 
@@ -106,6 +106,30 @@ function formatTime(seconds) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
+/* Home Assistant themes publish their colours as CSS custom properties on
+ * the document, and custom properties cross shadow boundaries, so the card
+ * can just point at them and follow whatever theme is active. */
+const COLOR_KEYWORDS = {
+  theme: "var(--primary-color, #ffffff)",
+  accent: "var(--accent-color, #ffffff)",
+  text: "var(--primary-text-color, #ffffff)",
+  white: "#ffffff",
+};
+
+/* Values from the config are interpolated straight into the stylesheet, so
+ * strip the characters that could end a declaration or a rule. A typo should
+ * lose its own property, not the rest of the card. */
+function cssSafe(value) {
+  return String(value).replace(/[;{}]/g, "").trim();
+}
+
+function cssColor(value, fallback) {
+  const raw = value == null ? "" : String(value).trim();
+  const keyword = COLOR_KEYWORDS[raw.toLowerCase()];
+  if (keyword) return keyword;
+  return cssSafe(raw) || fallback;
+}
+
 /* Fill "{title} · {artist}" and drop separators around empty values. */
 function renderTemplate(template, values) {
   const tokens = template.split(/(\{[a-z_]+\})/g);
@@ -147,7 +171,8 @@ const DEFAULTS = {
   cover_position: "bottom right",
   cover_radius: 10,
   gradient: true,
-  accent: "#ffffff",
+  accent: "theme", // theme | accent | text | white | any CSS colour
+  icon_color: "white",
   title_format: "{title} · {artist}",
   idle_format: "{name}",
   font_size: 15,
@@ -923,7 +948,8 @@ class MinimalMusicPlayer extends HTMLElement {
     const fit = c.artwork_fit === "contain" ? "contain" : "cover";
     return `
       :host {
-        --mmp-accent: ${c.accent};
+        --mmp-accent: ${cssColor(c.accent, "#ffffff")};
+        --mmp-icon-color: ${cssColor(c.icon_color, "#ffffff")};
         --mmp-height: ${c.height}px;
         --mmp-radius: ${c.radius}px;
         --mmp-icon: ${c.control_size}px;
@@ -955,7 +981,7 @@ class MinimalMusicPlayer extends HTMLElement {
         bottom: 0;
         left: 0;
         background-size: ${fit};
-        background-position: ${c.artwork_position};
+        background-position: ${cssSafe(c.artwork_position)};
         background-repeat: no-repeat;
         filter: blur(${c.blur}px);
         transform: scale(${c.blur > 0 ? 1 + c.blur / 40 : 1});
@@ -1154,7 +1180,7 @@ class MinimalMusicPlayer extends HTMLElement {
         padding: 2px;
         margin: -2px;
         cursor: pointer;
-        color: #fff;
+        color: var(--mmp-icon-color);
         line-height: 0;
         border-radius: 50%;
         transition: transform 120ms ease, opacity 160ms ease;
@@ -1360,6 +1386,7 @@ const EDITOR_SCHEMA = [
       },
       { name: "artwork_position", selector: { text: {} } },
       { name: "accent", selector: { text: {} } },
+      { name: "icon_color", selector: { text: {} } },
       {
         name: "favorite_entity",
         selector: { entity: {} },
@@ -1397,6 +1424,7 @@ const EDITOR_LABELS = {
   stop_behavior: "Stop button",
   artwork_position: "Artwork position",
   accent: "Accent colour",
+  icon_color: "Icon colour",
   favorite_entity: "Favourite state entity",
 };
 

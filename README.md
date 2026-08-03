@@ -82,7 +82,27 @@ chip for the more-info dialog.
 | `blur` | number | `0` | Blur radius in pixels. |
 | `dim` | number | `0.35` | Black overlay, `0`–`1`. |
 | `gradient` | boolean | `true` | Extra gradient behind the text for legibility. |
-| `accent` | string | `#ffffff` | Colour of the progress bar and the active icons. |
+| `accent` | string | `theme` | Progress bar, volume slider and active icons (favourite, shuffle, repeat). |
+| `icon_color` | string | `white` | The control icons themselves. |
+
+Both take a keyword or any CSS colour:
+
+| Keyword | Resolves to |
+| --- | --- |
+| `theme` | `var(--primary-color)` — follows the active Home Assistant theme |
+| `accent` | `var(--accent-color)` |
+| `text` | `var(--primary-text-color)` |
+| `white` | `#ffffff` |
+
+Anything else is passed through, so `"#8b7cff"`, `"rgb(139 124 255)"` and
+`"var(--my-theme-variable, #fff)"` all work. Themes publish their colours as
+CSS custom properties on the document and those cross into the card, so
+`theme` needs no wiring — recolour your theme and the bar follows.
+
+The icons default to white rather than to the theme on purpose: they sit on
+top of album art, and white stays readable over any photo. `icon_color: theme`
+is there if you want them coloured anyway, but check it against a few dark
+covers first.
 
 ### Cover thumbnail
 
