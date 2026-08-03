@@ -142,7 +142,19 @@ buttons would point at something you cannot see.
 | `stop_behavior` | `stop` \| `turn_off` | `stop` | What the stop button does. |
 
 Available buttons: `prev`, `play`, `next`, `favorite`, `stop`, `power`,
-`shuffle`, `repeat`. Buttons the player does not support are dimmed.
+`shuffle`, `repeat`, `volume_down`, `volume_up`. Buttons the player does not
+support are dimmed.
+
+```yaml
+controls: [play, next, favorite, stop, volume_down, volume_up]
+```
+
+The volume buttons move by `volume_step` (default `0.05`) and set the level
+outright rather than calling Home Assistant's `volume_up` / `volume_down`,
+which step by whatever the integration decided and are usually far too coarse.
+Each press lands on a whole percent, so holding a small step does not drift.
+They dim at 0% and 100%. Players that cannot take an absolute level fall back
+to the stepping services.
 
 ### Progress and volume
 
@@ -152,6 +164,7 @@ Available buttons: `prev`, `play`, `next`, `favorite`, `stop`, `power`,
 | `show_timestamps` | boolean | `false` | `1:16 / 4:10` next to the buttons. |
 | `seek` | boolean | `true` | Tap the bar to seek (if the player supports it). |
 | `show_volume` | boolean | `false` | Slim volume slider above the progress bar. |
+| `volume_step` | number | `0.05` | How far one press of `volume_down` / `volume_up` moves, `0`–`1`. |
 
 ### Behaviour
 

@@ -8,7 +8,7 @@
  * as a module resource.
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.2.0";
 
 /* ------------------------------------------------------------------ icons */
 
@@ -30,6 +30,9 @@ const ICONS = {
     "M17,17H7V14L3,18L7,22V19H19V13H17M7,7H17V10L21,6L17,2V5H5V11H7V7Z",
   repeatOne:
     "M13,15V9H12L10,10V11H11.5V15M17,17H7V14L3,18L7,22V19H19V13H17M7,7H17V10L21,6L17,2V5H5V11H7V7Z",
+  volumeDown: "M3,9H7L12,4V20L7,15H3V9M14,11H22V13H14V11Z",
+  volumeUp:
+    "M3,9H7L12,4V20L7,15H3V9M14,11H17V8H19V11H22V13H19V16H17V13H14V11Z",
   volume:
     "M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z",
   speaker:
@@ -44,6 +47,7 @@ const SUPPORT = {
   SEEK: 2,
   VOLUME_SET: 4,
   VOLUME_MUTE: 8,
+  VOLUME_STEP: 1024,
   PREVIOUS_TRACK: 16,
   NEXT_TRACK: 32,
   TURN_ON: 128,
@@ -158,7 +162,7 @@ const DEFAULTS = {
   show_timestamps: false,
   seek: true,
   show_volume: false,
-  volume_step: 0.01,
+  volume_step: 0.05,
   idle: "dim", // dim | hide | show
   stop_behavior: "stop", // stop | turn_off
   favorite_entity: null,
@@ -176,6 +180,8 @@ const CONTROL_TYPES = [
   "power",
   "shuffle",
   "repeat",
+  "volume_down",
+  "volume_up",
 ];
 
 /* ------------------------------------------------------------------- card */
@@ -697,6 +703,20 @@ class MinimalMusicPlayer extends HTMLElement {
           els.root.classList.toggle("on", !!favorited);
           disabled = false;
           break;
+        case "volume_down":
+        case "volume_up": {
+          const up = type === "volume_up";
+          path = up ? ICONS.volumeUp : ICONS.volumeDown;
+          const canSet = supports(stateObj, SUPPORT.VOLUME_SET);
+          const level = attrsOf(stateObj).volume_level;
+          disabled =
+            disabled || !(canSet || supports(stateObj, SUPPORT.VOLUME_STEP));
+          // Dim the end of the range instead of letting it look live.
+          if (!disabled && canSet && typeof level === "number") {
+            disabled = up ? level >= 0.999 : level <= 0.001;
+          }
+          break;
+        }
         case "shuffle":
           path = ICONS.shuffle;
           els.root.classList.toggle("on", !!attrsOf(stateObj).shuffle);
@@ -795,12 +815,38 @@ class MinimalMusicPlayer extends HTMLElement {
         this._mediaCall("repeat_set", { repeat: next });
         break;
       }
+      case "volume_down":
+        this._stepVolume(stateObj, -1);
+        break;
+      case "volume_up":
+        this._stepVolume(stateObj, 1);
+        break;
       case "favorite":
         this._favorite(entityId);
         break;
       default:
         break;
     }
+  }
+
+  /* Home Assistant's own volume_up/volume_down step by whatever the
+   * integration decided, which is usually far too coarse. Set the level
+   * outright where the player allows it, and fall back to the services only
+   * for players that cannot take an absolute level. */
+  _stepVolume(stateObj, direction) {
+    const step = Number(this._config.volume_step) || 0.05;
+
+    if (!supports(stateObj, SUPPORT.VOLUME_SET)) {
+      this._mediaCall(direction > 0 ? "volume_up" : "volume_down");
+      return;
+    }
+
+    const current = Number(attrsOf(stateObj).volume_level) || 0;
+    const next = Math.min(1, Math.max(0, current + direction * step));
+    if (Math.abs(next - current) < 0.0005) return;
+
+    // Round to whole percent so repeated presses cannot drift.
+    this._mediaCall("volume_set", { volume_level: Math.round(next * 100) / 100 });
   }
 
   _favorite(entityId) {
@@ -1220,6 +1266,10 @@ const EDITOR_SCHEMA = [
         name: "control_size",
         selector: { number: { min: 14, max: 48, mode: "box" } },
       },
+      {
+        name: "volume_step",
+        selector: { number: { min: 0.01, max: 0.5, step: 0.01, mode: "box" } },
+      },
       { name: "font_size", selector: { number: { min: 10, max: 30, mode: "box" } } },
       { name: "blur", selector: { number: { min: 0, max: 30, mode: "box" } } },
       {
@@ -1326,6 +1376,7 @@ const EDITOR_LABELS = {
   chip_labels: "Names on chips",
   hide_inactive: "Hide idle speakers",
   show_volume: "Volume slider",
+  volume_step: "Volume button step",
   show_cover: "Cover thumbnail",
   cover_size: "Cover size",
   cover_radius: "Cover radius",
