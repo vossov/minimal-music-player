@@ -320,3 +320,8 @@ effect and nothing else.
 - Playback position is extrapolated between state updates, so the bar moves
   smoothly instead of jumping once a minute.
 - Animations are disabled when the system asks for reduced motion.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Use, modify and redistribute it, commercially
+too; the licence text travels along and there is no warranty.
