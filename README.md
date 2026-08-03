@@ -125,6 +125,14 @@ separator in front of it, so `{title} · {artist}` never leaves a dangling `·`.
 | `show_chips` | `auto` \| `always` \| `never` | `auto` | `auto` hides them when there is only one speaker. |
 | `chip_artwork` | boolean | `true` | Show the cover as the chip avatar. |
 | `chip_labels` | boolean | `true` | Set to `false` for avatar-only chips. |
+| `hide_inactive` | boolean | `false` | Drop speakers that are idle, off or unavailable. |
+
+`hide_inactive` keeps the row down to whatever is actually running, which is
+usually the difference between chips that fit and chips that scroll. The
+trade-off is that a hidden speaker cannot be tapped, so the row stops being a
+way to switch players and becomes a display of what is on. The speaker being
+controlled always keeps its chip, even once it goes quiet — otherwise the
+buttons would point at something you cannot see.
 
 ### Controls
 

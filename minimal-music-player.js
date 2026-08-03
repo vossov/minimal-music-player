@@ -151,6 +151,7 @@ const DEFAULTS = {
   show_chips: "auto", // auto | always | never
   chip_artwork: true,
   chip_labels: true,
+  hide_inactive: false,
   controls: ["play", "next", "favorite", "stop"],
   control_size: 24,
   show_progress: true,
@@ -628,9 +629,16 @@ class MinimalMusicPlayer extends HTMLElement {
       const stateObj = this._stateOf(conf.entity);
       const state = stateName(stateObj) || "unavailable";
 
+      const inactive = !ACTIVE_STATES.includes(state);
       els.root.classList.toggle("active", conf.entity === activeId);
       els.root.classList.toggle("playing", state === "playing");
-      els.root.classList.toggle("off", !ACTIVE_STATES.includes(state));
+      els.root.classList.toggle("off", inactive);
+      // The player being controlled keeps its chip even when it goes quiet,
+      // otherwise the controls would point at something you cannot see.
+      els.root.classList.toggle(
+        "gone",
+        c.hide_inactive && inactive && conf.entity !== activeId,
+      );
 
       const name = this._friendlyName(conf.entity);
       if (els.name.textContent !== name) els.name.textContent = name;
@@ -999,6 +1007,7 @@ class MinimalMusicPlayer extends HTMLElement {
         transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
       }
       .chip > * + * { margin-left: 6px; }
+      .chip.gone { display: none; }
       .chip.no-label { padding: 3px; }
       .chip.no-label .chip-name { display: none; }
       .chip.no-art { padding-left: 10px; }
@@ -1230,6 +1239,7 @@ const EDITOR_SCHEMA = [
       { name: "gradient", selector: { boolean: {} } },
       { name: "chip_artwork", selector: { boolean: {} } },
       { name: "chip_labels", selector: { boolean: {} } },
+      { name: "hide_inactive", selector: { boolean: {} } },
       { name: "show_volume", selector: { boolean: {} } },
       { name: "show_cover", selector: { boolean: {} } },
     ],
@@ -1314,6 +1324,7 @@ const EDITOR_LABELS = {
   gradient: "Legibility gradient",
   chip_artwork: "Artwork on chips",
   chip_labels: "Names on chips",
+  hide_inactive: "Hide idle speakers",
   show_volume: "Volume slider",
   show_cover: "Cover thumbnail",
   cover_size: "Cover size",
