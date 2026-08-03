@@ -12,6 +12,7 @@ mind, but it works with any `media_player` entity.
 - Only the controls you list — by default play/pause, next, favourite and stop.
 - No dead space: the card is 132 px high out of the box.
 - Artwork fills the whole card, with an optional blur and dim.
+- Or: a sharp cover thumbnail in a corner over a blurred background.
 - Thin progress bar at the very bottom, tap it to seek.
 - Everything above is configurable, from the GUI editor or in YAML.
 
@@ -82,6 +83,28 @@ chip for the more-info dialog.
 | `dim` | number | `0.35` | Black overlay, `0`–`1`. |
 | `gradient` | boolean | `true` | Extra gradient behind the text for legibility. |
 | `accent` | string | `#ffffff` | Colour of the progress bar and the active icons. |
+
+### Cover thumbnail
+
+Fills the empty corner with a sharp copy of the cover while the background
+stays blurred behind it.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `show_cover` | boolean | `false` | Show the thumbnail. |
+| `cover_size` | number | `64` | Size in pixels. |
+| `cover_position` | string | `bottom right` | `bottom right`, `bottom left`, `top right` or `top left`. |
+| `cover_radius` | number | `10` | Corner radius; set it to half the size for a circle. |
+
+```yaml
+show_cover: true
+```
+
+That is all you need — switching the thumbnail on sets `blur: 18` for you,
+because a sharp cover on top of a sharp background reads as mush. Set `blur`
+yourself to override it (including `blur: 0`). The text and the buttons keep
+clear of the thumbnail automatically, so the timestamps land next to it rather
+than under it.
 
 ### Text
 
@@ -199,6 +222,19 @@ height: 100
 controls: [play, next, favorite]
 control_size: 22
 font_size: 14
+```
+
+Cover in the corner, timestamps beside it:
+
+```yaml
+type: custom:minimal-music-player
+entities:
+  - media_player.speaker_keuken_2
+  - media_player.speaker_slaapkamer
+show_cover: true
+cover_size: 76
+height: 150
+show_timestamps: true
 ```
 
 Frosted look, avatar-only chips:

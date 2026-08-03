@@ -127,6 +127,10 @@ const DEFAULTS = {
   artwork_position: "center center",
   blur: 0,
   dim: 0.35,
+  show_cover: false,
+  cover_size: 64,
+  cover_position: "bottom right",
+  cover_radius: 10,
   gradient: true,
   accent: "#ffffff",
   title_format: "{title} · {artist}",
@@ -208,6 +212,13 @@ class MinimalMusicPlayer extends HTMLElement {
     if (showChips === false) showChips = "never";
 
     this._config = { ...DEFAULTS, ...config, controls, show_chips: showChips };
+
+    // A sharp cover on top of a sharp background is mush, so blur the
+    // background unless the user picked a value themselves.
+    if (this._config.show_cover && config.blur === undefined) {
+      this._config.blur = 18;
+    }
+
     this._entities = entities;
     this._built = false;
     this.shadowRoot.innerHTML = "";
@@ -363,6 +374,7 @@ class MinimalMusicPlayer extends HTMLElement {
     card.innerHTML = `
       <div class="bg"></div>
       <div class="scrim"></div>
+      <div class="cover"></div>
       <div class="content">
         <div class="chips"></div>
         <div class="spacer"></div>
@@ -380,6 +392,7 @@ class MinimalMusicPlayer extends HTMLElement {
     this._els = {
       card,
       bg: card.querySelector(".bg"),
+      cover: card.querySelector(".cover"),
       chips: card.querySelector(".chips"),
       info: card.querySelector(".info"),
       marquee: card.querySelector(".marquee"),
@@ -392,6 +405,13 @@ class MinimalMusicPlayer extends HTMLElement {
       fill: card.querySelector(".fill"),
       buttons: {},
     };
+
+    if (c.show_cover) {
+      const tokens = String(c.cover_position).toLowerCase().split(/\s+/);
+      const vertical = tokens.includes("top") ? "top" : "bottom";
+      const horizontal = tokens.includes("left") ? "left" : "right";
+      card.classList.add("has-cover", `cover-${vertical}`, `cover-${horizontal}`);
+    }
 
     this._buildChips();
     this._buildControls();
@@ -518,13 +538,22 @@ class MinimalMusicPlayer extends HTMLElement {
   }
 
   _updateBackground(stateObj) {
-    if (this._config.artwork === "none") return;
     const url = this._artworkUrl(stateObj);
     const next = url ? `url("${url}")` : "none";
-    if (this._els.bg.style.backgroundImage !== next) {
-      this._els.bg.style.backgroundImage = next;
+
+    if (this._config.artwork !== "none") {
+      if (this._els.bg.style.backgroundImage !== next) {
+        this._els.bg.style.backgroundImage = next;
+      }
+      this._els.card.classList.toggle("no-art", !url);
     }
-    this._els.card.classList.toggle("no-art", !url);
+
+    if (this._config.show_cover) {
+      if (this._els.cover.style.backgroundImage !== next) {
+        this._els.cover.style.backgroundImage = next;
+      }
+      this._els.cover.classList.toggle("hidden", !url);
+    }
   }
 
   _updateText(entityId, stateObj, idle) {
@@ -814,6 +843,10 @@ class MinimalMusicPlayer extends HTMLElement {
         --mmp-radius: ${c.radius}px;
         --mmp-icon: ${c.control_size}px;
         --mmp-font: ${c.font_size}px;
+        --mmp-cover: ${c.cover_size}px;
+        --mmp-cover-radius: ${c.cover_radius}px;
+        --mmp-cover-inset: 12px;
+        --mmp-cover-space: calc(var(--mmp-cover) + var(--mmp-cover-inset) + 10px);
         display: block;
       }
       .card {
@@ -856,6 +889,39 @@ class MinimalMusicPlayer extends HTMLElement {
           rgba(0, 0, 0, ${c.dim});
         cursor: pointer;
       }
+
+      /* --------------------------------------------------- cover thumbnail */
+      .cover {
+        position: absolute;
+        z-index: 1;
+        width: var(--mmp-cover);
+        height: var(--mmp-cover);
+        border-radius: var(--mmp-cover-radius);
+        background-size: cover;
+        background-position: center;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+        display: none;
+        transition: opacity 300ms ease;
+      }
+      .card.has-cover .cover { display: block; }
+      .cover.hidden { opacity: 0; }
+      .cover-bottom .cover { bottom: var(--mmp-cover-inset); }
+      .cover-top .cover { top: var(--mmp-cover-inset); }
+      .cover-right .cover { right: var(--mmp-cover-inset); }
+      .cover-left .cover { left: var(--mmp-cover-inset); }
+
+      /* Keep text and controls clear of the thumbnail. */
+      .cover-bottom.cover-right .info,
+      .cover-bottom.cover-right .row,
+      .cover-bottom.cover-right .volume { padding-right: var(--mmp-cover-space); }
+      .cover-bottom.cover-left .info,
+      .cover-bottom.cover-left .row,
+      .cover-bottom.cover-left .volume { padding-left: var(--mmp-cover-space); }
+      /* The chip row scrolls, so it needs a smaller box -- padding would let
+         chips slide underneath the thumbnail. */
+      .cover-top.cover-right .chips { margin-right: var(--mmp-cover-space); }
+      .cover-top.cover-left .chips { margin-left: var(--mmp-cover-space); }
 
       .content {
         position: relative;
@@ -1130,6 +1196,35 @@ const EDITOR_SCHEMA = [
       { name: "chip_artwork", selector: { boolean: {} } },
       { name: "chip_labels", selector: { boolean: {} } },
       { name: "show_volume", selector: { boolean: {} } },
+      { name: "show_cover", selector: { boolean: {} } },
+    ],
+  },
+  {
+    type: "grid",
+    name: "",
+    schema: [
+      {
+        name: "cover_size",
+        selector: { number: { min: 32, max: 160, mode: "box" } },
+      },
+      {
+        name: "cover_radius",
+        selector: { number: { min: 0, max: 80, mode: "box" } },
+      },
+      {
+        name: "cover_position",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              "bottom right",
+              "bottom left",
+              "top right",
+              "top left",
+            ],
+          },
+        },
+      },
     ],
   },
   {
@@ -1185,6 +1280,10 @@ const EDITOR_LABELS = {
   chip_artwork: "Artwork on chips",
   chip_labels: "Names on chips",
   show_volume: "Volume slider",
+  show_cover: "Cover thumbnail",
+  cover_size: "Cover size",
+  cover_radius: "Cover radius",
+  cover_position: "Cover corner",
   show_chips: "Speaker chips",
   idle: "When idle",
   stop_behavior: "Stop button",
