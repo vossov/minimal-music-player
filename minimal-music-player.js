@@ -8,7 +8,7 @@
  * as a module resource.
  */
 
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.3.0";
 
 /* ------------------------------------------------------------------ icons */
 
@@ -143,7 +143,7 @@ const DEFAULTS = {
   blur: 0,
   dim: 0.35,
   show_cover: false,
-  cover_size: 64,
+  cover_size: 76,
   cover_position: "bottom right",
   cover_radius: 10,
   gradient: true,
@@ -170,6 +170,10 @@ const DEFAULTS = {
   tap_action: { action: "more-info" },
   hold_action: { action: "none" },
 };
+
+/* Distance from the thumbnail to the card edge. Shared by the CSS and by
+ * the size clamp in setConfig, so they cannot drift apart. */
+const COVER_INSET = 12;
 
 const CONTROL_TYPES = [
   "prev",
@@ -232,10 +236,17 @@ class MinimalMusicPlayer extends HTMLElement {
 
     this._config = { ...DEFAULTS, ...config, controls, show_chips: showChips };
 
-    // A sharp cover on top of a sharp background is mush, so blur the
-    // background unless the user picked a value themselves.
+    // A sharp cover on top of a sharp background is mush, so soften the
+    // background unless the user picked a value themselves -- including
+    // `blur: 0`, which is honoured and leaves the artwork sharp.
     if (this._config.show_cover && config.blur === undefined) {
-      this._config.blur = 18;
+      this._config.blur = 10;
+    }
+
+    // Keep the thumbnail inside the card however tall the card is.
+    const maxCover = Math.max(24, this._config.height - 2 * COVER_INSET);
+    if (this._config.cover_size > maxCover) {
+      this._config.cover_size = maxCover;
     }
 
     this._entities = entities;
@@ -919,7 +930,7 @@ class MinimalMusicPlayer extends HTMLElement {
         --mmp-font: ${c.font_size}px;
         --mmp-cover: ${c.cover_size}px;
         --mmp-cover-radius: ${c.cover_radius}px;
-        --mmp-cover-inset: 12px;
+        --mmp-cover-inset: ${COVER_INSET}px;
         --mmp-cover-space: calc(var(--mmp-cover) + var(--mmp-cover-inset) + 10px);
         display: block;
       }

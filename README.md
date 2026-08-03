@@ -92,7 +92,7 @@ stays blurred behind it.
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `show_cover` | boolean | `false` | Show the thumbnail. |
-| `cover_size` | number | `64` | Size in pixels. |
+| `cover_size` | number | `76` | Size in pixels. Clamped so it always fits the card height. |
 | `cover_position` | string | `bottom right` | `bottom right`, `bottom left`, `top right` or `top left`. |
 | `cover_radius` | number | `10` | Corner radius; set it to half the size for a circle. |
 
@@ -100,11 +100,15 @@ stays blurred behind it.
 show_cover: true
 ```
 
-That is all you need — switching the thumbnail on sets `blur: 18` for you,
-because a sharp cover on top of a sharp background reads as mush. Set `blur`
-yourself to override it (including `blur: 0`). The text and the buttons keep
-clear of the thumbnail automatically, so the timestamps land next to it rather
-than under it.
+That is all you need — switching the thumbnail on sets `blur: 10` for you,
+because a sharp cover on top of a sharp background reads as mush. It is only a
+starting point: set `blur` yourself and that wins, at any value including
+`blur: 0` for a background that stays sharp. Around `4` the artwork is still
+legible behind the card, `10` softens it to a wash of its colours, and past
+`16` it is a featureless gradient.
+
+The text and the buttons keep clear of the thumbnail automatically, so the
+timestamps land next to it rather than under it.
 
 ### Text
 
@@ -253,8 +257,8 @@ entities:
   - media_player.speaker_keuken_2
   - media_player.speaker_slaapkamer
 show_cover: true
-cover_size: 76
-height: 150
+cover_size: 88
+height: 160
 show_timestamps: true
 ```
 
@@ -265,7 +269,7 @@ type: custom:minimal-music-player
 entities:
   - media_player.speaker_keuken_2
   - media_player.speaker_slaapkamer
-blur: 18
+blur: 16
 dim: 0.45
 chip_labels: false
 accent: "#8b7cff"
