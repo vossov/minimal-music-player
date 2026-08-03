@@ -250,6 +250,24 @@ chip_labels: false
 accent: "#8b7cff"
 ```
 
+## Browser support
+
+The card is loaded as an ES module and is not bundled or transpiled, so the
+source is what the browser parses. It targets **Chrome 61 and up**, which is
+where ES modules land, to stay usable in the older Android WebViews that the
+Home Assistant companion app runs on.
+
+That rules out a few things that are otherwise ordinary: optional chaining and
+`??` (Chrome 80) are a *parse* error, which kills the whole module and stops
+the custom element from ever registering; flexbox `gap` (Chrome 84) and the
+`inset` shorthand (Chrome 87) are silently dropped and wreck the layout. CI
+parses the file at ES2018 and greps for those properties on every push,
+because a rendering test in a current headless Chrome cannot catch any of it.
+
+`backdrop-filter` and `mask-image` are used, but only for the frosted chips and
+the fade at the end of a long line. Where they are unsupported you lose the
+effect and nothing else.
+
 ## Notes
 
 - The card collapses itself with `idle: hide`, which pairs well with a

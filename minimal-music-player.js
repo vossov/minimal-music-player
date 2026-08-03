@@ -77,8 +77,19 @@ function normalizeEntity(item) {
   return { ...item, entity };
 }
 
+/* Spelled out rather than using `?.`: the card ships unbundled and has to
+ * parse on the older Android WebViews that Home Assistant companion apps
+ * still run on, where optional chaining is a syntax error. */
+function stateName(stateObj) {
+  return stateObj ? stateObj.state : undefined;
+}
+
+function attrsOf(stateObj) {
+  return (stateObj && stateObj.attributes) || {};
+}
+
 function supports(stateObj, feature) {
-  return ((stateObj?.attributes?.supported_features || 0) & feature) !== 0;
+  return ((attrsOf(stateObj).supported_features || 0) & feature) !== 0;
 }
 
 function formatTime(seconds) {
@@ -184,7 +195,7 @@ class MinimalMusicPlayer extends HTMLElement {
   }
 
   static getStubConfig(hass) {
-    const players = Object.keys(hass?.states || {})
+    const players = Object.keys((hass && hass.states) || {})
       .filter((id) => id.startsWith("media_player."))
       .slice(0, 3);
     return { entities: players };
@@ -203,11 +214,12 @@ class MinimalMusicPlayer extends HTMLElement {
       throw new Error("Define at least one media_player in `entities`.");
     }
 
-    let controls = config.controls ?? DEFAULTS.controls;
+    let controls = config.controls == null ? DEFAULTS.controls : config.controls;
     if (typeof controls === "string") controls = [controls];
     controls = controls.filter((c) => CONTROL_TYPES.includes(c));
 
-    let showChips = config.show_chips ?? DEFAULTS.show_chips;
+    let showChips =
+      config.show_chips == null ? DEFAULTS.show_chips : config.show_chips;
     if (showChips === true) showChips = "always";
     if (showChips === false) showChips = "never";
 
@@ -233,7 +245,8 @@ class MinimalMusicPlayer extends HTMLElement {
   }
 
   getCardSize() {
-    return Math.max(2, Math.ceil((this._config?.height || 132) / 50));
+    const height = (this._config && this._config.height) || 132;
+    return Math.max(2, Math.ceil(height / 50));
   }
 
   connectedCallback() {
@@ -247,18 +260,23 @@ class MinimalMusicPlayer extends HTMLElement {
   /* ------------------------------------------------------ entity plumbing */
 
   _stateOf(entityId) {
-    return this._hass?.states?.[entityId];
+    return this._hass && this._hass.states
+      ? this._hass.states[entityId]
+      : undefined;
   }
 
   /* The chip the user picked wins, until that player stops. Otherwise the
    * first player that is actually playing something. */
   _activeEntity() {
     const ids = this._entities.map((e) => e.entity);
-    const isActive = (id) => ACTIVE_STATES.includes(this._stateOf(id)?.state);
+    const isActive = (id) =>
+      ACTIVE_STATES.includes(stateName(this._stateOf(id)));
 
     if (this._selected && isActive(this._selected)) return this._selected;
 
-    const playing = ids.find((id) => this._stateOf(id)?.state === "playing");
+    const playing = ids.find(
+      (id) => stateName(this._stateOf(id)) === "playing",
+    );
     if (playing) return playing;
 
     if (this._selected && ids.includes(this._selected)) return this._selected;
@@ -273,7 +291,7 @@ class MinimalMusicPlayer extends HTMLElement {
     const conf = this._entityConfig(entityId);
     if (conf.name) return conf.name;
     const stateObj = this._stateOf(entityId);
-    return stateObj?.attributes?.friendly_name || entityId;
+    return attrsOf(stateObj).friendly_name || entityId;
   }
 
   _artworkUrl(stateObj) {
@@ -518,7 +536,7 @@ class MinimalMusicPlayer extends HTMLElement {
     const c = this._config;
     const entityId = this._activeEntity();
     const stateObj = this._stateOf(entityId);
-    const state = stateObj?.state || "unavailable";
+    const state = stateName(stateObj) || "unavailable";
     const idle = !ACTIVE_STATES.includes(state);
 
     if (idle && c.idle === "hide") {
@@ -558,7 +576,7 @@ class MinimalMusicPlayer extends HTMLElement {
 
   _updateText(entityId, stateObj, idle) {
     const c = this._config;
-    const attrs = stateObj?.attributes || {};
+    const attrs = attrsOf(stateObj);
     const values = {
       title: attrs.media_title || "",
       artist: attrs.media_artist || attrs.media_album_artist || "",
@@ -567,7 +585,7 @@ class MinimalMusicPlayer extends HTMLElement {
       channel: attrs.media_channel || "",
       app: attrs.app_name || "",
       name: this._friendlyName(entityId),
-      state: stateObj?.state || "",
+      state: stateName(stateObj) || "",
     };
 
     const template = idle || !values.title ? c.idle_format : c.title_format;
@@ -608,7 +626,7 @@ class MinimalMusicPlayer extends HTMLElement {
       const els = this._els.chipEls[conf.entity];
       if (!els) continue;
       const stateObj = this._stateOf(conf.entity);
-      const state = stateObj?.state || "unavailable";
+      const state = stateName(stateObj) || "unavailable";
 
       els.root.classList.toggle("active", conf.entity === activeId);
       els.root.classList.toggle("playing", state === "playing");
@@ -643,7 +661,8 @@ class MinimalMusicPlayer extends HTMLElement {
   _updateControls(stateObj, state) {
     const c = this._config;
     const favorited =
-      c.favorite_entity && this._stateOf(c.favorite_entity)?.state === "on";
+      c.favorite_entity &&
+      stateName(this._stateOf(c.favorite_entity)) === "on";
 
     for (const type of c.controls) {
       const els = this._els.buttons[type];
@@ -672,11 +691,11 @@ class MinimalMusicPlayer extends HTMLElement {
           break;
         case "shuffle":
           path = ICONS.shuffle;
-          els.root.classList.toggle("on", !!stateObj?.attributes?.shuffle);
+          els.root.classList.toggle("on", !!attrsOf(stateObj).shuffle);
           disabled = disabled || !supports(stateObj, SUPPORT.SHUFFLE_SET);
           break;
         case "repeat": {
-          const repeat = stateObj?.attributes?.repeat || "off";
+          const repeat = attrsOf(stateObj).repeat || "off";
           path = repeat === "one" ? ICONS.repeatOne : ICONS.repeat;
           els.root.classList.toggle("on", repeat !== "off");
           disabled = disabled || !supports(stateObj, SUPPORT.REPEAT_SET);
@@ -753,17 +772,17 @@ class MinimalMusicPlayer extends HTMLElement {
         break;
       case "power":
         this._mediaCall(
-          ACTIVE_STATES.includes(stateObj?.state) ? "turn_off" : "turn_on",
+          ACTIVE_STATES.includes(stateName(stateObj)) ? "turn_off" : "turn_on",
         );
         break;
       case "shuffle":
         this._mediaCall("shuffle_set", {
-          shuffle: !stateObj?.attributes?.shuffle,
+          shuffle: !attrsOf(stateObj).shuffle,
         });
         break;
       case "repeat": {
         const order = ["off", "all", "one"];
-        const current = stateObj?.attributes?.repeat || "off";
+        const current = attrsOf(stateObj).repeat || "off";
         const next = order[(order.indexOf(current) + 1) % order.length];
         this._mediaCall("repeat_set", { repeat: next });
         break;
@@ -778,7 +797,8 @@ class MinimalMusicPlayer extends HTMLElement {
 
   _favorite(entityId) {
     const c = this._config;
-    const button = this._els.buttons.favorite?.root;
+    const favoriteButton = this._els.buttons.favorite;
+    const button = favoriteButton && favoriteButton.root;
     if (button) {
       button.classList.remove("pulse");
       void button.offsetWidth; // restart the animation
@@ -820,7 +840,7 @@ class MinimalMusicPlayer extends HTMLElement {
     this._tick = window.setInterval(() => {
       if (!this._hass) return;
       const stateObj = this._stateOf(this._activeEntity());
-      if (stateObj?.state === "playing") this._updateProgress(stateObj);
+      if (stateName(stateObj) === "playing") this._updateProgress(stateObj);
     }, 500);
   }
 
@@ -865,7 +885,10 @@ class MinimalMusicPlayer extends HTMLElement {
 
       .bg {
         position: absolute;
-        inset: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
         background-size: ${fit};
         background-position: ${c.artwork_position};
         background-repeat: no-repeat;
@@ -879,7 +902,10 @@ class MinimalMusicPlayer extends HTMLElement {
 
       .scrim {
         position: absolute;
-        inset: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
         background:
           ${
             c.gradient
@@ -930,9 +956,9 @@ class MinimalMusicPlayer extends HTMLElement {
         flex-direction: column;
         padding: 10px 12px ${c.show_progress ? 10 : 8}px;
         box-sizing: border-box;
-        gap: 4px;
         pointer-events: none;
       }
+      .content > * + * { margin-top: 4px; }
       /* Sit above the progress bar's enlarged hit area so taps on the
          controls and the volume slider are never swallowed by it. */
       .content > * { pointer-events: auto; position: relative; z-index: 2; }
@@ -941,28 +967,29 @@ class MinimalMusicPlayer extends HTMLElement {
       /* ------------------------------------------------------------ chips */
       .chips {
         display: flex;
-        gap: 6px;
         overflow-x: auto;
         scrollbar-width: none;
         margin: -2px -2px 0;
         padding: 2px;
       }
       .chips::-webkit-scrollbar { display: none; }
+      .chip + .chip { margin-left: 6px; }
       /* Hint that there are more speakers to the right. */
       .chips.overflowing {
+        -webkit-mask-image: linear-gradient(to right, #000 84%, transparent 100%);
         mask-image: linear-gradient(to right, #000 84%, transparent 100%);
       }
 
       .chip {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
         flex: 0 0 auto;
         max-width: 62%;
         padding: 3px 10px 3px 3px;
         border: 1px solid rgba(255, 255, 255, 0.22);
         border-radius: 999px;
         background: rgba(0, 0, 0, 0.28);
+        -webkit-backdrop-filter: blur(8px);
         backdrop-filter: blur(8px);
         color: rgba(255, 255, 255, 0.82);
         font: inherit;
@@ -971,6 +998,7 @@ class MinimalMusicPlayer extends HTMLElement {
         cursor: pointer;
         transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
       }
+      .chip > * + * { margin-left: 6px; }
       .chip.no-label { padding: 3px; }
       .chip.no-label .chip-name { display: none; }
       .chip.no-art { padding-left: 10px; }
@@ -1001,7 +1029,8 @@ class MinimalMusicPlayer extends HTMLElement {
         text-overflow: ellipsis;
       }
 
-      .eq { display: none; gap: 2px; align-items: flex-end; height: 10px; }
+      .eq { display: none; align-items: flex-end; height: 10px; }
+      .eq i + i { margin-left: 2px; }
       .chip.playing .eq { display: inline-flex; }
       .eq i {
         width: 2px;
@@ -1022,6 +1051,7 @@ class MinimalMusicPlayer extends HTMLElement {
       .marquee {
         overflow: hidden;
         white-space: nowrap;
+        -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
         mask-image: linear-gradient(to right, #000 88%, transparent 100%);
       }
       .marquee .text {
@@ -1044,13 +1074,14 @@ class MinimalMusicPlayer extends HTMLElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
       }
       .controls {
         display: flex;
         align-items: center;
-        gap: 14px;
       }
+      /* 12px, not 14px: each button carries 2px of padding and -2px of
+         margin, so this lands on the same 14px gap between the glyphs. */
+      .btn + .btn { margin-left: 12px; }
       .btn {
         border: 0;
         background: none;
@@ -1079,6 +1110,7 @@ class MinimalMusicPlayer extends HTMLElement {
       }
 
       .times {
+        margin-left: 8px;
         font-size: 11px;
         font-variant-numeric: tabular-nums;
         opacity: 0.75;
@@ -1125,7 +1157,10 @@ class MinimalMusicPlayer extends HTMLElement {
       .progress::before {
         content: "";
         position: absolute;
-        inset: -8px 0 0;
+        top: -8px;
+        right: 0;
+        bottom: 0;
+        left: 0;
       }
       .fill {
         height: 100%;
