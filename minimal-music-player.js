@@ -8,7 +8,7 @@
  * as a module resource.
  */
 
-const CARD_VERSION = "1.4.0";
+const CARD_VERSION = "1.5.0";
 
 /* ------------------------------------------------------------------ icons */
 
