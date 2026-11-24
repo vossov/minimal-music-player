@@ -8,7 +8,7 @@
  * as a module resource.
  */
 
-const CARD_VERSION = "1.5.0";
+const CARD_VERSION = "1.5.1";
 
 /* ------------------------------------------------------------------ icons */
 
@@ -207,7 +207,7 @@ const DEFAULTS = {
   volume_step: 0.05,
   idle: "dim", // dim | hide | show
   stop_behavior: "stop", // stop | turn_off
-  live_controls: true, // radio: play becomes stop, prev/next dimmed
+  live_controls: true, // radio: play becomes stop, prev/next/stop hidden
   favorite_entity: null,
   favorite_action: null,
   tap_action: { action: "more-info" },
@@ -733,12 +733,18 @@ class MinimalMusicPlayer extends HTMLElement {
       stateName(this._stateOf(c.favorite_entity)) === "on";
 
     const live = c.live_controls && isLive(stateObj);
+    // On a live stream the play button already stops, so a separate stop
+    // button would be a duplicate; prev/next have nothing to skip to.
+    const playStops = live && c.controls.includes("play");
 
     for (const type of c.controls) {
       const els = this._els.buttons[type];
       if (!els) continue;
       let path = ICONS[type];
       let disabled = !stateObj;
+      const hidden =
+        (live && (type === "next" || type === "prev")) ||
+        (playStops && type === "stop");
 
       switch (type) {
         case "play":
@@ -753,11 +759,10 @@ class MinimalMusicPlayer extends HTMLElement {
           disabled = disabled || !supports(stateObj, SUPPORT.PLAY | SUPPORT.PAUSE);
           break;
         case "next":
-          disabled = disabled || live || !supports(stateObj, SUPPORT.NEXT_TRACK);
+          disabled = disabled || !supports(stateObj, SUPPORT.NEXT_TRACK);
           break;
         case "prev":
-          disabled =
-            disabled || live || !supports(stateObj, SUPPORT.PREVIOUS_TRACK);
+          disabled = disabled || !supports(stateObj, SUPPORT.PREVIOUS_TRACK);
           break;
         case "stop":
           disabled = disabled || !ACTIVE_STATES.includes(state);
@@ -799,6 +804,7 @@ class MinimalMusicPlayer extends HTMLElement {
 
       if (els.path.getAttribute("d") !== path) els.path.setAttribute("d", path);
       els.root.classList.toggle("disabled", disabled);
+      els.root.classList.toggle("hidden", hidden);
     }
   }
 
@@ -1210,7 +1216,10 @@ class MinimalMusicPlayer extends HTMLElement {
       }
       /* 12px, not 14px: each button carries 2px of padding and -2px of
          margin, so this lands on the same 14px gap between the glyphs. */
-      .btn + .btn { margin-left: 12px; }
+      .btn.hidden { display: none; }
+      /* Spacing after any visible button, so a hidden first button does
+       * not leave a gap in front of the next one. */
+      .btn:not(.hidden) ~ .btn { margin-left: 12px; }
       .btn {
         border: 0;
         background: none;

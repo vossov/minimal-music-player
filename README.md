@@ -164,7 +164,7 @@ buttons would point at something you cannot see.
 | --- | --- | --- | --- |
 | `controls` | list | `[play, next, favorite, stop]` | Which buttons, in this order. |
 | `stop_behavior` | `stop` \| `turn_off` | `stop` | What the stop button does. |
-| `live_controls` | boolean | `true` | On radio, play/pause becomes play/stop and prev/next are dimmed. |
+| `live_controls` | boolean | `true` | On radio, play/pause becomes play/stop; prev, next and a separate stop are hidden. |
 
 Available buttons: `prev`, `play`, `next`, `favorite`, `stop`, `power`,
 `shuffle`, `repeat`, `volume_down`, `volume_up`. Buttons the player does not
@@ -180,7 +180,8 @@ Radio is recognised from the `media_content_id` Music Assistant reports
 for radio as well, but there is no next track on a live stream and pausing
 only leaves you listening behind. So while radio plays, the play button
 stops the stream instead of pausing it, and pressing play again rejoins it
-live. Set `live_controls: false` to keep the plain behaviour.
+live. Prev and next are hidden, and so is the stop button, which would only
+duplicate play. Set `live_controls: false` to keep the plain behaviour.
 
 The volume buttons move by `volume_step` (default `0.05`) and set the level
 outright rather than calling Home Assistant's `volume_up` / `volume_down`,
