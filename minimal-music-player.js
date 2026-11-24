@@ -96,6 +96,23 @@ function supports(stateObj, feature) {
   return ((attrsOf(stateObj).supported_features || 0) & feature) !== 0;
 }
 
+/* A live stream has no "next track" and pausing it only builds up a delay
+ * you then have to listen through. Music Assistant reports the same
+ * supported_features for radio as for music and always says content type
+ * "music", so the only reliable tell is the item URI it puts in
+ * media_content_id: provider://radio/item_id. Other integrations that do
+ * label their content are recognised by type. */
+const LIVE_URI = /^[a-z0-9_-]+:\/\/radio\//i;
+const LIVE_TYPES = ["radio", "channel"];
+
+function isLive(stateObj) {
+  const attrs = attrsOf(stateObj);
+  const id = attrs.media_content_id;
+  if (typeof id === "string" && LIVE_URI.test(id)) return true;
+  const type = String(attrs.media_content_type || "").toLowerCase();
+  return LIVE_TYPES.includes(type);
+}
+
 function formatTime(seconds) {
   if (seconds === null || seconds === undefined || isNaN(seconds)) return "";
   const total = Math.max(0, Math.round(seconds));
@@ -190,6 +207,7 @@ const DEFAULTS = {
   volume_step: 0.05,
   idle: "dim", // dim | hide | show
   stop_behavior: "stop", // stop | turn_off
+  live_controls: true, // radio: play becomes stop, prev/next dimmed
   favorite_entity: null,
   favorite_action: null,
   tap_action: { action: "more-info" },
@@ -714,6 +732,8 @@ class MinimalMusicPlayer extends HTMLElement {
       c.favorite_entity &&
       stateName(this._stateOf(c.favorite_entity)) === "on";
 
+    const live = c.live_controls && isLive(stateObj);
+
     for (const type of c.controls) {
       const els = this._els.buttons[type];
       if (!els) continue;
@@ -722,14 +742,22 @@ class MinimalMusicPlayer extends HTMLElement {
 
       switch (type) {
         case "play":
-          path = state === "playing" ? ICONS.pause : ICONS.play;
+          if (live) {
+            path =
+              state === "playing" || state === "buffering"
+                ? ICONS.stop
+                : ICONS.play;
+          } else {
+            path = state === "playing" ? ICONS.pause : ICONS.play;
+          }
           disabled = disabled || !supports(stateObj, SUPPORT.PLAY | SUPPORT.PAUSE);
           break;
         case "next":
-          disabled = disabled || !supports(stateObj, SUPPORT.NEXT_TRACK);
+          disabled = disabled || live || !supports(stateObj, SUPPORT.NEXT_TRACK);
           break;
         case "prev":
-          disabled = disabled || !supports(stateObj, SUPPORT.PREVIOUS_TRACK);
+          disabled =
+            disabled || live || !supports(stateObj, SUPPORT.PREVIOUS_TRACK);
           break;
         case "stop":
           disabled = disabled || !ACTIVE_STATES.includes(state);
@@ -821,9 +849,18 @@ class MinimalMusicPlayer extends HTMLElement {
     const stateObj = this._stateOf(entityId);
 
     switch (type) {
-      case "play":
-        this._mediaCall("media_play_pause");
+      case "play": {
+        const s = stateName(stateObj);
+        const running = s === "playing" || s === "buffering";
+        // Stopping a live stream and starting it again rejoins it live;
+        // pausing would resume minutes behind.
+        if (running && c.live_controls && isLive(stateObj)) {
+          this._mediaCall("media_stop");
+        } else {
+          this._mediaCall("media_play_pause");
+        }
         break;
+      }
       case "next":
         this._mediaCall("media_next_track");
         break;
@@ -1328,6 +1365,7 @@ const EDITOR_SCHEMA = [
       { name: "chip_labels", selector: { boolean: {} } },
       { name: "hide_inactive", selector: { boolean: {} } },
       { name: "show_volume", selector: { boolean: {} } },
+      { name: "live_controls", selector: { boolean: {} } },
       { name: "show_cover", selector: { boolean: {} } },
     ],
   },
@@ -1414,6 +1452,7 @@ const EDITOR_LABELS = {
   chip_labels: "Names on chips",
   hide_inactive: "Hide idle speakers",
   show_volume: "Volume slider",
+  live_controls: "Radio-aware buttons",
   volume_step: "Volume button step",
   show_cover: "Cover thumbnail",
   cover_size: "Cover size",
